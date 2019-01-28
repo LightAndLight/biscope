@@ -23,15 +23,22 @@ data Ty ki ty
   deriving (Functor, Foldable, Traversable)
 deriveBifunctor ''Ty
 
-data Tm f ki ty tm
+data Tm f ty tm
   = TmVar tm
-  | TmApp (Tm f ki ty tm) (Tm f ki ty tm)
-  | TmLamTm (Maybe (f ki ty)) (Scope () (Tm t ki ty) tm)
-  | TmLamTy (Biscope () (f ki) Tm ty tm)
-  | TmPack (f ki ty) (Tm f ki ty tm)
-  | TmOpen (Tm f ki ty tm) _
-  | TyArr
-  | TyCtor String
+  | TmAnn (Tm f ty tm) (f ty)
+  | TmApp (Tm f ty tm) (Tm f ty tm)
+
+  -- Value abstraction with optional annotation (lowercase lambda)
+  | TmLamTm (Maybe (f ty)) (Scope () (Tm f ty) tm)
+
+  -- Type abstraction (uppercase lambda)
+  | TmLamTy (Biscope () f Tm ty tm)
+
+  -- Existential introduction
+  | TmPack (f ty) (Tm f ty tm)
+
+  -- Existential elimination
+  | TmOpen (Tm f ty tm) (Biscope2 () () f Tm ty tm)
   deriving (Functor, Foldable, Traversable)
 deriveBifunctor ''Ty
 
