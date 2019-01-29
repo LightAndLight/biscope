@@ -2,12 +2,12 @@
 {-# language QuantifiedConstraints #-}
 {-# language TemplateHaskell #-}
 module Biscope
-  ( -- * @Biscope1@
-    Biscope1(..)
+  ( Bisubst(..)
+    -- * @Biscope1@
+  , Biscope1(..)
   , toBiscope1
   , fromBiscope1
     -- ** Substitution
-  , Bisubst(..)
   , bisubstBiscope1
   , substBiscope1
     -- ** Abstraction
@@ -20,6 +20,8 @@ module Biscope
   , Biscope2(..)
   , toBiscope2
   , fromBiscope2
+    -- ** Substitution
+  , bisubstBiscope2
     -- ** Abstraction
   , absBiscope2
   , abs1Biscope2
@@ -352,3 +354,20 @@ inst1Biscope2R ::
   Biscope2 b () f g a a' ->
   Biscope1 b f g a a'
 inst1Biscope2R a = instBiscope2R (const a)
+
+bisubstBiscope2 ::
+  Bisubst g f =>
+  (ty -> f ty') ->
+  (tm -> g ty' tm') ->
+  Biscope2 b b' f g ty tm ->
+  Biscope2 b b' f g ty' tm'
+bisubstBiscope2 f g =
+  Biscope2 .
+  bisubst
+    (unvar (pure . B) (fmap (F . pure) . f =<<))
+    (unvar
+       (bireturn . B)
+       (bisubst
+          (unvar (pure . B) (fmap (F . pure) . f =<<))
+          (bimap (F . pure) (F . bireturn) . g))) .
+  unBiscope2

@@ -31,6 +31,7 @@ executable example
                      , biscope
                      , bifunctors
                      , bound
+                     , deriving-compat
   hs-source-dirs:      example
   main-is:             Example.hs
   ghc-options:         -Wall -Werror

@@ -16,3 +16,6 @@ class (Bifunctor g, Monad f) => Bisubst g f | g -> f where
 
   bijoin :: g (f a) (g a a') -> g a a'
   bijoin = bisubst id id
+
+bisubstBimapDefault :: Bisubst g f => (a -> c) -> (b -> d) -> g a b -> g c d
+bisubstBimapDefault f g = bisubst (pure . f) (bireturn . g)
