@@ -1,21 +1,35 @@
 {-# language FlexibleInstances, MultiParamTypeClasses #-}
+{-# language KindSignatures #-}
 {-# language QuantifiedConstraints #-}
 {-# language TemplateHaskell #-}
 module Biscope
   ( Bisubst(..)
-    -- * @Biscope1@
-  , Biscope1(..)
-  , toBiscope1
-  , fromBiscope1
+    -- * @BiscopeL@
+  , BiscopeL(..)
+  , toBiscopeL
+  , fromBiscopeL
     -- ** Substitution
-  , bisubstBiscope1
-  , substBiscope1
+  , bisubstBiscopeL
+  , substBiscopeL
     -- ** Abstraction
-  , absBiscope1
-  , abs1Biscope1
+  , absBiscopeL
+  , abs1BiscopeL
     -- ** Instantiation
-  , instBiscope1
-  , inst1Biscope1
+  , instBiscopeL
+  , inst1BiscopeL
+    -- * @BiscopeR@
+  , BiscopeR(..)
+  , toBiscopeR
+  , fromBiscopeR
+    -- ** Substitution
+  , bisubstBiscopeR
+  , substBiscopeR
+    -- ** Abstraction
+  , absBiscopeR
+  , abs1BiscopeR
+    -- ** Instantiation
+  , instBiscopeR
+  , inst1BiscopeR
     -- * @Biscope2@
   , Biscope2(..)
   , toBiscope2
@@ -50,108 +64,216 @@ import Data.Functor.Classes
 
 import Bisubst.Class
 
-newtype Biscope1 b f g a a' = Biscope1 { unBiscope1 :: g (Var b (f a)) a' }
-deriveEq2 ''Biscope1
-deriveShow2 ''Biscope1
-deriveOrd2 ''Biscope1
+newtype BiscopeL b f g a a' = BiscopeL { unBiscopeL :: g (Var b (f a)) a' }
+deriveEq2 ''BiscopeL
+deriveShow2 ''BiscopeL
+deriveOrd2 ''BiscopeL
 
-instance (Eq b, Eq1 f, Eq2 g, Eq a) => Eq1 (Biscope1 b f g a) where
+instance (Eq b, Eq1 f, Eq2 g, Eq a) => Eq1 (BiscopeL b f g a) where
   liftEq = liftEq2 (==)
 
-instance (Eq b, Eq1 f, Eq2 g, Eq a, Eq a') => Eq (Biscope1 b f g a a') where
+instance (Eq b, Eq1 f, Eq2 g, Eq a, Eq a') => Eq (BiscopeL b f g a a') where
   (==) = eq1
 
-instance (Show b, Show1 f, Show2 g, Show a) => Show1 (Biscope1 b f g a) where
+instance (Show b, Show1 f, Show2 g, Show a) => Show1 (BiscopeL b f g a) where
   liftShowsPrec = liftShowsPrec2 showsPrec showList
 
-instance (Show b, Show1 f, Show2 g, Show a, Show a') => Show (Biscope1 b f g a a') where
+instance (Show b, Show1 f, Show2 g, Show a, Show a') => Show (BiscopeL b f g a a') where
   showsPrec = showsPrec1
 
-instance (Ord b, Ord1 f, Ord2 g, Ord a) => Ord1 (Biscope1 b f g a) where
+instance (Ord b, Ord1 f, Ord2 g, Ord a) => Ord1 (BiscopeL b f g a) where
   liftCompare = liftCompare2 compare
 
-instance (Ord b, Ord1 f, Ord2 g, Ord a, Ord a') => Ord (Biscope1 b f g a a') where
+instance (Ord b, Ord1 f, Ord2 g, Ord a, Ord a') => Ord (BiscopeL b f g a a') where
   compare = compare
 
-instance (forall x. Functor (g x)) => Functor (Biscope1 b f g a) where
-  fmap f (Biscope1 s) = Biscope1 $ fmap f s
+instance (forall x. Functor (g x)) => Functor (BiscopeL b f g a) where
+  fmap f (BiscopeL s) = BiscopeL $ fmap f s
 
-instance (forall x. Foldable (g x)) => Foldable (Biscope1 b f g a) where
-  foldMap f (Biscope1 s) = foldMap f s
+instance (forall x. Foldable (g x)) => Foldable (BiscopeL b f g a) where
+  foldMap f (BiscopeL s) = foldMap f s
 
-instance (forall x. Traversable (g x)) => Traversable (Biscope1 b f g a) where
-  traverse f (Biscope1 s) = Biscope1 <$> traverse f s
+instance (forall x. Traversable (g x)) => Traversable (BiscopeL b f g a) where
+  traverse f (BiscopeL s) = BiscopeL <$> traverse f s
 
-instance (Functor f, Bifunctor g) => Bifunctor (Biscope1 b f g) where
-  bimap f g (Biscope1 s) = Biscope1 $ bimap (fmap (fmap f)) g s
+instance (Functor f, Bifunctor g) => Bifunctor (BiscopeL b f g) where
+  bimap f g (BiscopeL s) = BiscopeL $ bimap (fmap (fmap f)) g s
 
-instance (Foldable f, Bifoldable g) => Bifoldable (Biscope1 b f g) where
-  bifoldMap f g (Biscope1 s) = bifoldMap (foldMap (foldMap f)) g s
+instance (Foldable f, Bifoldable g) => Bifoldable (BiscopeL b f g) where
+  bifoldMap f g (BiscopeL s) = bifoldMap (foldMap (foldMap f)) g s
 
-instance (Traversable f, Bitraversable g) => Bitraversable (Biscope1 b f g) where
-  bitraverse f g (Biscope1 s) = Biscope1 <$> bitraverse (traverse (traverse f)) g s
+instance (Traversable f, Bitraversable g) => Bitraversable (BiscopeL b f g) where
+  bitraverse f g (BiscopeL s) = BiscopeL <$> bitraverse (traverse (traverse f)) g s
 
-instance (Bifunctor g, forall x. Monad (g x)) => Applicative (Biscope1 b f g a) where
+instance (Bifunctor g, forall x. Monad (g x)) => Applicative (BiscopeL b f g a) where
   pure = return
   (<*>) = ap
 
-instance (Bifunctor g, forall x. Monad (g x)) => Monad (Biscope1 b f g a) where
-  return = Biscope1 . return
-  (>>=) (Biscope1 s) f = Biscope1 (unBiscope1 . f =<< s)
+instance (Bifunctor g, forall x. Monad (g x)) => Monad (BiscopeL b f g a) where
+  return = BiscopeL . return
+  (>>=) (BiscopeL s) f = BiscopeL (unBiscopeL . f =<< s)
 
-instance (Monad f, Bisubst g f) => Bisubst (Biscope1 b f g) f where
-  bireturn = Biscope1 . bireturn
-  bisubst f g (Biscope1 s) =
-    Biscope1 $
+instance (Monad f, Bisubst g f) => Bisubst (BiscopeL b f g) f where
+  bireturn = BiscopeL . bireturn
+  bisubst f g (BiscopeL s) =
+    BiscopeL $
     bisubst
       (unvar (return . B) (fmap (F . return) . f =<<))
-      (unBiscope1 . g)
+      (unBiscopeL . g)
       s
 
-substBiscope1 ::
+substBiscopeL ::
   Bisubst g f =>
   (tm -> g ty tm') ->
-  Biscope1 b f g ty tm ->
-  Biscope1 b f g ty tm'
-substBiscope1 f =
-  Biscope1 .
+  BiscopeL b f g ty tm ->
+  BiscopeL b f g ty tm'
+substBiscopeL f =
+  BiscopeL .
   bisubst return (bimap (F . return) id . f) .
-  unBiscope1
+  unBiscopeL
 
-bisubstBiscope1 ::
+bisubstBiscopeL ::
   Bisubst g f =>
   (ty -> f ty') ->
   (tm -> g ty' tm') ->
-  Biscope1 b f g ty tm ->
-  Biscope1 b f g ty' tm'
-bisubstBiscope1 f g =
-  Biscope1 .
+  BiscopeL b f g ty tm ->
+  BiscopeL b f g ty' tm'
+bisubstBiscopeL f g =
+  BiscopeL .
   bisubst
     (unvar (return . B) (fmap (F . return) . f =<<))
     (bimap (F . return) id . g) .
-  unBiscope1
+  unBiscopeL
 
-absBiscope1 :: Bisubst g f => (a -> Maybe b) -> g a a' -> Biscope1 b f g a a'
-absBiscope1 f =
-  Biscope1 .
+absBiscopeL :: Bisubst g f => (a -> Maybe b) -> g a a' -> BiscopeL b f g a a'
+absBiscopeL f =
+  BiscopeL .
   bisubst
     (\a -> maybe (return . F $ return a) (return . B) $ f a)
     bireturn
 
-abs1Biscope1 :: (Eq a, Bisubst g f) => a -> g a a' -> Biscope1 () f g a a'
-abs1Biscope1 a = absBiscope1 (\x -> if x == a then Just () else Nothing)
+abs1BiscopeL :: (Eq a, Bisubst g f) => a -> g a a' -> BiscopeL () f g a a'
+abs1BiscopeL a = absBiscopeL (\x -> if x == a then Just () else Nothing)
 
-instBiscope1 :: Bisubst g f => (b -> f a) -> Biscope1 b f g a a' -> g a a'
-instBiscope1 f (Biscope1 s) = bisubst (unvar f id) bireturn s
+instBiscopeL :: Bisubst g f => (b -> f a) -> BiscopeL b f g a a' -> g a a'
+instBiscopeL f (BiscopeL s) = bisubst (unvar f id) bireturn s
 
-inst1Biscope1 :: Bisubst g f => f a -> Biscope1 () f g a a' -> g a a'
-inst1Biscope1 a = instBiscope1 (const a)
+inst1BiscopeL :: Bisubst g f => f a -> BiscopeL () f g a a' -> g a a'
+inst1BiscopeL a = instBiscopeL (const a)
 
-toBiscope1 :: Bisubst g f => g (Var b a) a' -> Biscope1 b f g a a'
-toBiscope1 = Biscope1 . bimap (fmap return) id
+toBiscopeL :: Bisubst g f => g (Var b a) a' -> BiscopeL b f g a a'
+toBiscopeL = BiscopeL . bimap (fmap return) id
 
-fromBiscope1 :: Bisubst g f => Biscope1 b f g a a' -> g (Var b a) a'
-fromBiscope1 = bisubst (unvar (return . B) (fmap F)) bireturn . unBiscope1
+fromBiscopeL :: Bisubst g f => BiscopeL b f g a a' -> g (Var b a) a'
+fromBiscopeL = bisubst (unvar (return . B) (fmap F)) bireturn . unBiscopeL
+
+newtype BiscopeR b (f :: * -> *) g a a'
+  = BiscopeR { unBiscopeR :: g a (Var b (g a a')) }
+deriveEq2 ''BiscopeR
+deriveShow2 ''BiscopeR
+deriveOrd2 ''BiscopeR
+
+instance (Eq b, Eq1 f, Eq2 g, Eq a) => Eq1 (BiscopeR b f g a) where
+  liftEq = liftEq2 (==)
+
+instance (Eq b, Eq1 f, Eq2 g, Eq a, Eq a') => Eq (BiscopeR b f g a a') where
+  (==) = eq1
+
+instance (Show b, Show1 f, Show2 g, Show a) => Show1 (BiscopeR b f g a) where
+  liftShowsPrec = liftShowsPrec2 showsPrec showList
+
+instance (Show b, Show1 f, Show2 g, Show a, Show a') => Show (BiscopeR b f g a a') where
+  showsPrec = showsPrec1
+
+instance (Ord b, Ord1 f, Ord2 g, Ord a) => Ord1 (BiscopeR b f g a) where
+  liftCompare = liftCompare2 compare
+
+instance (Ord b, Ord1 f, Ord2 g, Ord a, Ord a') => Ord (BiscopeR b f g a a') where
+  compare = compare
+
+instance (forall x. Functor (g x)) => Functor (BiscopeR b f g a) where
+  fmap f (BiscopeR s) = BiscopeR $ fmap (fmap (fmap f)) s
+
+instance (forall x. Foldable (g x)) => Foldable (BiscopeR b f g a) where
+  foldMap f (BiscopeR s) = foldMap (foldMap (foldMap f)) s
+
+instance (forall x. Traversable (g x)) => Traversable (BiscopeR b f g a) where
+  traverse f (BiscopeR s) = BiscopeR <$> traverse (traverse (traverse f)) s
+
+instance (Functor f, Bifunctor g) => Bifunctor (BiscopeR b f g) where
+  bimap f g (BiscopeR s) = BiscopeR $ bimap f (fmap (bimap f g)) s
+
+instance (Foldable f, Bifoldable g) => Bifoldable (BiscopeR b f g) where
+  bifoldMap f g (BiscopeR s) = bifoldMap f (foldMap (bifoldMap f g)) s
+
+instance (Traversable f, Bitraversable g) => Bitraversable (BiscopeR b f g) where
+  bitraverse f g (BiscopeR s) = BiscopeR <$> bitraverse f (traverse (bitraverse f g)) s
+
+instance (Bifunctor g, forall x. Monad (g x)) => Applicative (BiscopeR b f g a) where
+  pure = return
+  (<*>) = ap
+
+instance (Bifunctor g, forall x. Monad (g x)) => Monad (BiscopeR b f g a) where
+  return = BiscopeR . return . F . return
+  (>>=) (BiscopeR s) f = BiscopeR $ s >>= unvar (return . B) (>>= unBiscopeR . f)
+
+instance (Monad f, Bisubst g f) => Bisubst (BiscopeR b f g) f where
+  bireturn = BiscopeR . bireturn . F . bireturn
+  bisubst f g (BiscopeR s) =
+    BiscopeR $
+    bisubst
+      f
+      (unvar (bireturn . B) (bisubst f (unBiscopeR . g)))
+      s
+
+substBiscopeR ::
+  Bisubst g f =>
+  (tm -> g ty tm') ->
+  BiscopeR b f g ty tm ->
+  BiscopeR b f g ty tm'
+substBiscopeR f =
+  BiscopeR .
+  bisubst
+    return
+    (unvar
+       (bireturn . B)
+       (bisubst return (bimap id (F . bireturn) . f))) .
+  unBiscopeR
+
+bisubstBiscopeR ::
+  Bisubst g f =>
+  (ty -> f ty') ->
+  (tm -> g ty' tm') ->
+  BiscopeR b f g ty tm ->
+  BiscopeR b f g ty' tm'
+bisubstBiscopeR f g =
+  BiscopeR .
+  bisubst
+    f
+    (unvar
+       (bireturn . B)
+       (bisubst f (bimap id (F . bireturn) . g))) .
+  unBiscopeR
+
+absBiscopeR :: Bisubst g f => (a' -> Maybe b) -> g a a' -> BiscopeR b f g a a'
+absBiscopeR f =
+  BiscopeR .
+  bisubst pure (\x -> maybe (bireturn . F $ bireturn x) (bireturn . B) $ f x)
+
+abs1BiscopeR :: (Eq a', Bisubst g f) => a' -> g a a' -> BiscopeR () f g a a'
+abs1BiscopeR a = absBiscopeR (\x -> if x == a then Just () else Nothing)
+
+instBiscopeR :: Bisubst g f => (b -> g a a') -> BiscopeR b f g a a' -> g a a'
+instBiscopeR f (BiscopeR s) = bisubst return (unvar f id) s
+
+inst1BiscopeR :: Bisubst g f => g a a' -> BiscopeR () f g a a' -> g a a'
+inst1BiscopeR a = instBiscopeR (const a)
+
+toBiscopeR :: Bisubst g f => g a (Var b a') -> BiscopeR b f g a a'
+toBiscopeR = BiscopeR . bimap id (fmap bireturn)
+
+fromBiscopeR :: Bisubst g f => BiscopeR b f g a a' -> g a (Var b a')
+fromBiscopeR = bisubst pure (unvar (bireturn . B) (bimap id F)) . unBiscopeR
 
 bisubstScope ::
   Bisubst g f =>
@@ -340,9 +462,9 @@ instBiscope2R ::
   Bisubst g f =>
   (b' -> g a a') ->
   Biscope2 b b' f g a a' ->
-  Biscope1 b f g a a'
+  BiscopeL b f g a a'
 instBiscope2R f =
-  Biscope1 .
+  BiscopeL .
   bisubst
     pure
     (unvar (bimap (F . pure) id . f) id) .
@@ -352,7 +474,7 @@ inst1Biscope2R ::
   Bisubst g f =>
   g a a' ->
   Biscope2 b () f g a a' ->
-  Biscope1 b f g a a'
+  BiscopeL b f g a a'
 inst1Biscope2R a = instBiscope2R (const a)
 
 bisubstBiscope2 ::

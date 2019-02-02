@@ -28,6 +28,7 @@ library
 
 executable example
   build-depends:       base ^>=4.12.0.0
+                     , ansi-wl-pprint
                      , biscope
                      , bifunctors
                      , bound
