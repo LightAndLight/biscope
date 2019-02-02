@@ -1,5 +1,6 @@
 {-# language DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 {-# language FlexibleInstances, MultiParamTypeClasses #-}
+{-# language LambdaCase #-}
 {-# language TemplateHaskell #-}
 {-# language TypeApplications #-}
 module Main where
@@ -478,6 +479,11 @@ topTy =
 topId :: Tm ki ty tm
 topId = TmPack idTy id_
 
+openTopId :: Tm ki ty tm
+openTopId =
+  TmOpen (TmAnn topId topTy) $ toBiscope2 $
+  TmVar (B ())
+
 main :: IO ()
 main = do
   let r1 = id_ @() @() @()
@@ -497,3 +503,18 @@ main = do
   print $ pretty r4
 
   print $ check (const Nothing) (const Nothing) (const Nothing) r4 r3
+
+  let r5 = openTopId @() @() @()
+  print $ pretty r5
+
+  print $ infer (const Nothing) (const Nothing) (const Nothing) r5
+
+  let r6 = TmAppTy r1 (TyCtor "A")
+  print $ pretty r6
+  print $
+    pretty <$>
+    infer
+      (const Nothing)
+      (\case; "A" -> Just KindType; _ -> Nothing)
+      (const Nothing)
+      r6
