@@ -2,6 +2,7 @@
 {-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language LambdaCase #-}
 {-# language TemplateHaskell #-}
+{-# language TypeFamilies #-}
 {-# language TypeApplications #-}
 module Main where
 
@@ -141,7 +142,8 @@ instance (Eq ki, Eq ty) => Eq (Ty ki ty) where; (==) = eq2
 instance (Show ki, Show ty) => Show (Ty ki ty) where; showsPrec = showsPrec2
 
 instance Bifunctor Ty where; bimap = bisubstBimapDefault
-instance Bisubst Ty Kind where
+instance Bisubst Ty where
+  type Inner Ty = Kind
   bireturn = TyVar
   bisubst f g ty =
     case ty of
@@ -307,7 +309,8 @@ instance (Show ki, Show ty, Show tm) => Show (Tm ki ty tm) where
   showsPrec = showsPrec2
 
 instance Bifunctor (Tm ki) where; bimap = bisubstBimapDefault
-instance Bisubst (Tm ki) (Ty ki) where
+instance Bisubst (Tm ki) where
+  type Inner (Tm ki) = Ty ki
   bireturn = TmVar
 
   bisubst f g tm =

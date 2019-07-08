@@ -1,7 +1,9 @@
+{-# language FlexibleContexts #-}
 {-# language FlexibleInstances, MultiParamTypeClasses #-}
 {-# language KindSignatures #-}
 {-# language QuantifiedConstraints #-}
 {-# language TemplateHaskell #-}
+{-# language TypeFamilies #-}
 module Biscope
   ( Bisubst(..)
     -- * @BiscopeL@
@@ -113,7 +115,8 @@ instance (Bifunctor g, forall x. Monad (g x)) => Monad (BiscopeL b f g a) where
   return = BiscopeL . return
   (>>=) (BiscopeL s) f = BiscopeL (unBiscopeL . f =<< s)
 
-instance (Monad f, Bisubst g f) => Bisubst (BiscopeL b f g) f where
+instance (Bisubst g, f ~ Inner g) => Bisubst (BiscopeL b f g) where
+  type Inner (BiscopeL b f g) = Inner g
   bireturn = BiscopeL . bireturn
   bisubst f g (BiscopeL s) =
     BiscopeL $
@@ -123,7 +126,7 @@ instance (Monad f, Bisubst g f) => Bisubst (BiscopeL b f g) f where
       s
 
 substBiscopeL ::
-  Bisubst g f =>
+  (Bisubst g, f ~ Inner g) =>
   (tm -> g ty tm') ->
   BiscopeL b f g ty tm ->
   BiscopeL b f g ty tm'
@@ -133,7 +136,7 @@ substBiscopeL f =
   unBiscopeL
 
 bisubstBiscopeL ::
-  Bisubst g f =>
+  (Bisubst g, f ~ Inner g) =>
   (ty -> f ty') ->
   (tm -> g ty' tm') ->
   BiscopeL b f g ty tm ->
@@ -145,26 +148,26 @@ bisubstBiscopeL f g =
     (bimap (F . return) id . g) .
   unBiscopeL
 
-absBiscopeL :: Bisubst g f => (a -> Maybe b) -> g a a' -> BiscopeL b f g a a'
+absBiscopeL :: (Bisubst g, f ~ Inner g) => (a -> Maybe b) -> g a a' -> BiscopeL b f g a a'
 absBiscopeL f =
   BiscopeL .
   bisubst
     (\a -> maybe (return . F $ return a) (return . B) $ f a)
     bireturn
 
-abs1BiscopeL :: (Eq a, Bisubst g f) => a -> g a a' -> BiscopeL () f g a a'
+abs1BiscopeL :: (Eq a, Bisubst g, f ~ Inner g) => a -> g a a' -> BiscopeL () f g a a'
 abs1BiscopeL a = absBiscopeL (\x -> if x == a then Just () else Nothing)
 
-instBiscopeL :: Bisubst g f => (b -> f a) -> BiscopeL b f g a a' -> g a a'
+instBiscopeL :: (Bisubst g, f ~ Inner g) => (b -> f a) -> BiscopeL b f g a a' -> g a a'
 instBiscopeL f (BiscopeL s) = bisubst (unvar f id) bireturn s
 
-inst1BiscopeL :: Bisubst g f => f a -> BiscopeL () f g a a' -> g a a'
+inst1BiscopeL :: (Bisubst g, f ~ Inner g) => f a -> BiscopeL () f g a a' -> g a a'
 inst1BiscopeL a = instBiscopeL (const a)
 
-toBiscopeL :: Bisubst g f => g (Var b a) a' -> BiscopeL b f g a a'
+toBiscopeL :: (Bisubst g, f ~ Inner g) => g (Var b a) a' -> BiscopeL b f g a a'
 toBiscopeL = BiscopeL . bimap (fmap return) id
 
-fromBiscopeL :: Bisubst g f => BiscopeL b f g a a' -> g (Var b a) a'
+fromBiscopeL :: (Bisubst g, f ~ Inner g) => BiscopeL b f g a a' -> g (Var b a) a'
 fromBiscopeL = bisubst (unvar (return . B) (fmap F)) bireturn . unBiscopeL
 
 newtype BiscopeR b (f :: * -> *) g a a'
@@ -217,7 +220,8 @@ instance (Bifunctor g, forall x. Monad (g x)) => Monad (BiscopeR b f g a) where
   return = BiscopeR . return . F . return
   (>>=) (BiscopeR s) f = BiscopeR $ s >>= unvar (return . B) (>>= unBiscopeR . f)
 
-instance (Monad f, Bisubst g f) => Bisubst (BiscopeR b f g) f where
+instance (Bisubst g, f ~ Inner g) => Bisubst (BiscopeR b f g) where
+  type Inner (BiscopeR b f g) = Inner g
   bireturn = BiscopeR . bireturn . F . bireturn
   bisubst f g (BiscopeR s) =
     BiscopeR $
@@ -227,7 +231,7 @@ instance (Monad f, Bisubst g f) => Bisubst (BiscopeR b f g) f where
       s
 
 substBiscopeR ::
-  Bisubst g f =>
+  (Bisubst g, f ~ Inner g) =>
   (tm -> g ty tm') ->
   BiscopeR b f g ty tm ->
   BiscopeR b f g ty tm'
@@ -241,7 +245,7 @@ substBiscopeR f =
   unBiscopeR
 
 bisubstBiscopeR ::
-  Bisubst g f =>
+  (Bisubst g, f ~ Inner g) =>
   (ty -> f ty') ->
   (tm -> g ty' tm') ->
   BiscopeR b f g ty tm ->
@@ -255,28 +259,28 @@ bisubstBiscopeR f g =
        (bisubst f (bimap id (F . bireturn) . g))) .
   unBiscopeR
 
-absBiscopeR :: Bisubst g f => (a' -> Maybe b) -> g a a' -> BiscopeR b f g a a'
+absBiscopeR :: (Bisubst g, f ~ Inner g) => (a' -> Maybe b) -> g a a' -> BiscopeR b f g a a'
 absBiscopeR f =
   BiscopeR .
   bisubst pure (\x -> maybe (bireturn . F $ bireturn x) (bireturn . B) $ f x)
 
-abs1BiscopeR :: (Eq a', Bisubst g f) => a' -> g a a' -> BiscopeR () f g a a'
+abs1BiscopeR :: (Eq a', Bisubst g, f ~ Inner g) => a' -> g a a' -> BiscopeR () f g a a'
 abs1BiscopeR a = absBiscopeR (\x -> if x == a then Just () else Nothing)
 
-instBiscopeR :: Bisubst g f => (b -> g a a') -> BiscopeR b f g a a' -> g a a'
+instBiscopeR :: (Bisubst g, f ~ Inner g) => (b -> g a a') -> BiscopeR b f g a a' -> g a a'
 instBiscopeR f (BiscopeR s) = bisubst return (unvar f id) s
 
-inst1BiscopeR :: Bisubst g f => g a a' -> BiscopeR () f g a a' -> g a a'
+inst1BiscopeR :: (Bisubst g, f ~ Inner g) => g a a' -> BiscopeR () f g a a' -> g a a'
 inst1BiscopeR a = instBiscopeR (const a)
 
-toBiscopeR :: Bisubst g f => g a (Var b a') -> BiscopeR b f g a a'
+toBiscopeR :: (Bisubst g, f ~ Inner g) => g a (Var b a') -> BiscopeR b f g a a'
 toBiscopeR = BiscopeR . bimap id (fmap bireturn)
 
-fromBiscopeR :: Bisubst g f => BiscopeR b f g a a' -> g a (Var b a')
+fromBiscopeR :: (Bisubst g, f ~ Inner g) => BiscopeR b f g a a' -> g a (Var b a')
 fromBiscopeR = bisubst pure (unvar (bireturn . B) (bimap id F)) . unBiscopeR
 
 bisubstScope ::
-  Bisubst g f =>
+  (Bisubst g, f ~ Inner g) =>
   (ty -> f ty') ->
   (tm -> g ty' tm') ->
   Scope b (g ty) tm ->
@@ -348,7 +352,8 @@ instance (Bifunctor g, forall x. Monad (g x)) => Monad (Biscope2 b b' f g a) whe
     Biscope2 $
     s >>= unvar (pure . B) (unBiscope2 . f =<<)
 
-instance (Monad f, Bisubst g f) => Bisubst (Biscope2 b b' f g) f where
+instance (Bisubst g, f ~ Inner g) => Bisubst (Biscope2 b b' f g) where
+  type Inner (Biscope2 b b' f g) = Inner g
   bireturn = Biscope2 . bireturn . F . bireturn
   bisubst f g =
     Biscope2 .
@@ -362,13 +367,13 @@ instance (Monad f, Bisubst g f) => Bisubst (Biscope2 b b' f g) f where
     unBiscope2
 
 toBiscope2 ::
-  Bisubst g f =>
+  (Bisubst g, f ~ Inner g) =>
   g (Var b a) (Var b' a') ->
   Biscope2 b b' f g a a'
 toBiscope2 = Biscope2 . bimap (fmap return) (fmap bireturn)
 
 fromBiscope2 ::
-  Bisubst g f =>
+  (Bisubst g, f ~ Inner g) =>
   Biscope2 b b' f g a a' ->
   g (Var b a) (Var b' a')
 fromBiscope2 =
@@ -380,7 +385,7 @@ fromBiscope2 =
     unwrap = unvar (return . B) (fmap F)
 
 absBiscope2 ::
-  Bisubst g f =>
+  (Bisubst g, f ~ Inner g) =>
   (a -> Maybe b) ->
   (a' -> Maybe b') ->
   g a a' ->
@@ -392,7 +397,7 @@ absBiscope2 f g =
     (\x -> bireturn . maybe (F $ bireturn x) B $ g x)
 
 abs1Biscope2 ::
-  (Eq a, Eq a', Bisubst g f) =>
+  (Eq a, Eq a', Bisubst g, f ~ Inner g) =>
   a ->
   a' ->
   g a a' ->
@@ -403,7 +408,7 @@ abs1Biscope2 a a' =
     (\x -> if a' == x then Just () else Nothing)
 
 absScopeL ::
-  Bisubst g f =>
+  (Bisubst g, f ~ Inner g) =>
   (a -> Maybe b) ->
   Scope b' (g a) a' ->
   Biscope2 b b' f g a a'
@@ -419,14 +424,14 @@ absScopeL f =
   unscope
 
 abs1ScopeL ::
-  (Eq a, Bisubst g f) =>
+  (Eq a, Bisubst g, f ~ Inner g) =>
   a ->
   Scope b' (g a) a' ->
   Biscope2 () b' f g a a'
 abs1ScopeL a = absScopeL (\x -> if x == a then Just () else Nothing)
 
 instBiscope2 ::
-  Bisubst g f =>
+  (Bisubst g, f ~ Inner g) =>
   (b -> f a) ->
   (b' -> g a a') ->
   Biscope2 b b' f g a a' -> g a a'
@@ -436,11 +441,11 @@ instBiscope2 f g =
     (unvar g (bisubst (unvar f id) bireturn)) .
   unBiscope2
 
-inst1Biscope2 :: Bisubst g f => f a -> g a a' -> Biscope2 () () f g a a' -> g a a'
+inst1Biscope2 :: (Bisubst g, f ~ Inner g) => f a -> g a a' -> Biscope2 () () f g a a' -> g a a'
 inst1Biscope2 a b = instBiscope2 (const a) (const b)
 
 instBiscope2L ::
-  Bisubst g f =>
+  (Bisubst g, f ~ Inner g) =>
   (b -> f a) ->
   Biscope2 b b' f g a a' ->
   Scope b' (g a) a'
@@ -452,14 +457,14 @@ instBiscope2L f =
   unBiscope2
 
 inst1Biscope2L ::
-  Bisubst g f =>
+  (Bisubst g, f ~ Inner g) =>
   f a ->
   Biscope2 () b' f g a a' ->
   Scope b' (g a) a'
 inst1Biscope2L a = instBiscope2L (const a)
 
 instBiscope2R ::
-  Bisubst g f =>
+  (Bisubst g, f ~ Inner g) =>
   (b' -> g a a') ->
   Biscope2 b b' f g a a' ->
   BiscopeL b f g a a'
@@ -471,14 +476,14 @@ instBiscope2R f =
   unBiscope2
 
 inst1Biscope2R ::
-  Bisubst g f =>
+  (Bisubst g, f ~ Inner g) =>
   g a a' ->
   Biscope2 b () f g a a' ->
   BiscopeL b f g a a'
 inst1Biscope2R a = instBiscope2R (const a)
 
 bisubstBiscope2 ::
-  Bisubst g f =>
+  (Bisubst g, f ~ Inner g) =>
   (ty -> f ty') ->
   (tm -> g ty' tm') ->
   Biscope2 b b' f g ty tm ->
